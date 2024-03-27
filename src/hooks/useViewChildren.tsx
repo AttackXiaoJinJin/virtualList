@@ -20,7 +20,7 @@ function useViewChildren(props:{
     endIndex:number;
     setRef: (item:any,element: HTMLElement) => void;
     scrollWidth: number;
-    getKey:any;
+    getDataKey:any;
     renderFunc:(
         item: any,
         index: number,
@@ -28,14 +28,14 @@ function useViewChildren(props:{
     ) => React.ReactNode;
 
 }) {
-    // fixme:scrollWidth干嘛用的
-    const {scrollWidth,list,startIndex,endIndex,getKey,renderFunc,setRef}=props
+    // scrollWidth指定滚动宽度
+    const {scrollWidth,list,startIndex,endIndex,getDataKey,renderFunc,setRef}=props
 
     return list.reduce((total,current,currIndex)=>{
        if(currIndex<startIndex || currIndex>endIndex + 1){
            return total
        }
-       const key = getKey(current);
+       const key = getDataKey(current);
        const itemElement = renderFunc(current, currIndex, {
            style: { width: scrollWidth }
         }) as React.ReactElement;

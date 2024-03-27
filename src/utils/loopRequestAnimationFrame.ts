@@ -24,35 +24,35 @@ function cleanup(id: number) {
 const loopRequestAnimationFrame = (callback: () => void, times = 1): number => {
     requestAnimationFrameUuid += 1;
     // 因为递归会形成闭包，所以这里要赋值，避免 uuid 变掉了
-    const id = requestAnimationFrameUuid;
+    const uuid = requestAnimationFrameUuid;
 
     function callRef(leftTimes: number) {
         if (leftTimes === 0) {
             // Clean up
-            cleanup(id);
+            cleanup(uuid);
 
             // Trigger
             callback();
         } else {
             // Next mockRequestAnimationFrame
-            const realId = mockRequestAnimationFrame(() => {
+            const requestAnimationFrameId = mockRequestAnimationFrame(() => {
                 callRef(leftTimes - 1);
             });
 
-            // Bind real loopRequestAnimationFrame id
-            requestAnimationFrameIds.set(id, realId);
+            // Bind requestAnimationFrameId
+            requestAnimationFrameIds.set(uuid, requestAnimationFrameId);
         }
     }
 
     callRef(times);
 
-    return id;
+    return uuid;
 };
 
-loopRequestAnimationFrame.cancel = (id: number) => {
-    const realId = requestAnimationFrameIds.get(id);
-    cleanup(id);
-    return mockCancelAnimationFrame(realId);
+loopRequestAnimationFrame.cancel = (uuid: number) => {
+    const requestAnimationFrameId = requestAnimationFrameIds.get(uuid);
+    cleanup(uuid);
+    return mockCancelAnimationFrame(requestAnimationFrameId);
 };
 // 不适合vite
 // if (process.env.NODE_ENV !== 'production') {
