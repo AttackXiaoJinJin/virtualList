@@ -38,6 +38,7 @@ function VirtualList(props:VirtualListProps) {
             }
 
 
+
         })
 
 
@@ -149,15 +150,16 @@ function VirtualList(props:VirtualListProps) {
             viewStartOffset,
         }
 
-    },[data, getDataKey, height, inVirtual, itemHeight, useVirtual, viewHeights])
+    },[data, getDataKey, height, inVirtual, itemHeight, offsetTop, useVirtual, viewHeights])
+    //
 
 
     //渲染每个item===================
     const renderedRefChildren=useViewChildren({
         scrollWidth,
         list,
-        startIndex,
-        endIndex,
+        viewStartIndex,
+        viewEndIndex,
         getDataKey,
         renderFunc,
         setRef

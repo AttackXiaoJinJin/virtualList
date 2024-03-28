@@ -15,9 +15,9 @@ function ItemRef({children,setRef}:{
 function useViewChildren(props:{
     list:any[];
     // 可视区域item开始下标
-    startIndex:number;
+    viewStartIndex:number;
     // 可视区域item末尾下标
-    endIndex:number;
+    viewEndIndex:number;
     setRef: (item:any,element: HTMLElement) => void;
     scrollWidth: number;
     getDataKey:any;
@@ -29,10 +29,10 @@ function useViewChildren(props:{
 
 }) {
     // scrollWidth指定滚动宽度
-    const {scrollWidth,list,startIndex,endIndex,getDataKey,renderFunc,setRef}=props
+    const {scrollWidth,list,viewStartIndex,viewEndIndex,getDataKey,renderFunc,setRef}=props
 
     return list.reduce((total,current,currIndex)=>{
-       if(currIndex<startIndex || currIndex>endIndex + 1){
+       if(currIndex<viewStartIndex || currIndex>viewEndIndex + 1){
            return total
        }
        const key = getDataKey(current);
