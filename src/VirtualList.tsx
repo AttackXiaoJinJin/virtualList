@@ -10,6 +10,9 @@ interface VirtualListProps {
     itemHeight?:number;
     data:any[];
     scrollWidth?:number;
+    className?:string;
+    component?: React.FC<any>;
+    fullHeight?:boolean;
 }
 
 function VirtualList(props:VirtualListProps) {
@@ -19,30 +22,19 @@ function VirtualList(props:VirtualListProps) {
         itemHeight,
         data,
         scrollWidth,
+        className,
+        component:Component,
+        fullHeight = true,
+
     }=props
 
     const useVirtual = Boolean(height && itemHeight);
     const inVirtual = useVirtual && (itemHeight! * data.length > height! || Boolean(scrollWidth));
+
     const fillerInnerRef = useRef<HTMLDivElement>();
+    const componentRef = useRef<HTMLDivElement>();
 
 
-    const [offsetTop, setOffsetTop] = useState(0);
-    const [offsetLeft, setOffsetLeft] = useState(0);
-    const syncScrollTop=useCallback((newTop:number|((prevTop:number)=>number))=>{
-        setOffsetTop((origin)=>{
-            let newScrollTop:number
-            if(typeof newTop==='function'){
-                newScrollTop=newTop(origin)
-            }else{
-                newScrollTop=newTop
-            }
-
-
-
-        })
-
-
-    },[])
 
 
     //scrollMoving=================================
@@ -74,6 +66,10 @@ function VirtualList(props:VirtualListProps) {
         viewHeights,
         collectViewElementHeight
     }=useViewHeights({getDataKey})
+
+    const [offsetTop, setOffsetTop] = useState(0);
+    const [offsetLeft, setOffsetLeft] = useState(0);
+
 
     // 计算需要滚动的高度，开始index，最后index，滚动的偏移量==============
     const {
@@ -151,8 +147,42 @@ function VirtualList(props:VirtualListProps) {
         }
 
     },[data, getDataKey, height, inVirtual, itemHeight, offsetTop, useVirtual, viewHeights])
-    //
 
+
+
+    // 记录滚动时，data容器和指定高度容器的最大可滚动高度
+    const maxScrollHeight=itemScrollTop-height
+    const maxScrollHeightRef = useRef(maxScrollHeight);
+    maxScrollHeightRef.current = maxScrollHeight;
+    // 当列表不可滚动时不阻止滚动
+    // https://github.com/react-component/virtual-list/pull/55
+    // fixme:当列表不可以滚动时，为什么滚动条还能滚动？
+    // 控制滚动条滚动的范围，不至于离谱
+    const keepScrollbarInRange=useCallback((newScrollTop:number)=>{
+        let newTop = newScrollTop;
+        if (!Number.isNaN(maxScrollHeightRef.current)) {
+            newTop = Math.min(newTop, maxScrollHeightRef.current);
+        }
+        newTop = Math.max(newTop, 0);
+        return newTop;
+    },[])
+
+    const syncScrollTop=useCallback((newTop:number|((prevTop:number)=>number))=>{
+        setOffsetTop((origin)=>{
+            let newScrollTop:number
+            if(typeof newTop==='function'){
+                newScrollTop=newTop(origin)
+            }else{
+                newScrollTop=newTop
+            }
+            const adjustedScrollTop=keepScrollbarInRange(newScrollTop)
+            // 缓存
+            componentRef.current.scrollTop=adjustedScrollTop
+            return adjustedScrollTop
+        })
+
+
+    },[keepScrollbarInRange])
 
     //渲染每个item===================
     const renderedRefChildren=useViewChildren({
@@ -185,14 +215,33 @@ function VirtualList(props:VirtualListProps) {
         return componentStyle
     },[height, scrollMoving, scrollWidth, useVirtual])
 
+    const [size, setSize] = useState({ width: 0, height });
+
+    const onHolderResize=useCallback((sizeInfo:{width:number;offsetWidth:number;height:number;offsetHeight:number;})=>{
+        const {width,offsetWidth,height,offsetHeight}=sizeInfo
+        setSize({
+            width:width||offsetWidth,
+            height:height||offsetHeight
+        })
+    },[])
+
     return <div
         // fixme:为什么要加relative，子是fixed/absolute
         style={{position:'relative'}}
+        className={className}
     >
+        <ResizeObserver onResize={onHolderResize}>
+            <Component
+                style={componentStyle}
+                ref={componentRef}
+                onScroll={onFallbackScroll}
+                /* 注意这个 */
+                onMouseEnter={delayHideScrollBar}
+            >
 
 
-
-
+            </Component>
+        </ResizeObserver>
     </div>
 
 
