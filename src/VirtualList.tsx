@@ -13,6 +13,8 @@ interface VirtualListProps {
     className?:string;
     component?: React.FC<any>;
     fullHeight?:boolean;
+    onNativeScroll?:React.UIEventHandler<HTMLElement>;
+    onVirtualScroll?: (info: {x: number; y: number;}) => void;
 }
 
 function VirtualList(props:VirtualListProps) {
@@ -25,7 +27,8 @@ function VirtualList(props:VirtualListProps) {
         className,
         component:Component,
         fullHeight = true,
-
+        onNativeScroll,
+        onVirtualScroll,
     }=props
 
     const useVirtual = Boolean(height && itemHeight);
@@ -213,7 +216,7 @@ function VirtualList(props:VirtualListProps) {
             }
         }
         return componentStyle
-    },[height, scrollMoving, scrollWidth, useVirtual])
+    },[fullHeight, height, scrollMoving, scrollWidth, useVirtual])
 
     const [size, setSize] = useState({ width: 0, height });
 
@@ -225,6 +228,46 @@ function VirtualList(props:VirtualListProps) {
         })
     },[])
 
+    const virtualScrollInfo = useMemo(()=>{
+        return {
+            x: offsetLeft,
+            y: offsetTop,
+        }
+    },[offsetLeft, offsetTop])
+    // 用ref的原因是记录比较，这样就不每次都触发事件
+    const lastVirtualScrollInfoRef = useRef(virtualScrollInfo);
+
+    const triggerVirtualScroll = useCallback(() => {
+        if (onVirtualScroll) {
+            const nextInfo = virtualScrollInfo;
+            // 值没有更新就不触发事件
+            if (
+                lastVirtualScrollInfoRef.current.x !== nextInfo.x ||
+                lastVirtualScrollInfoRef.current.y !== nextInfo.y
+            ) {
+                onVirtualScroll(nextInfo);
+
+                lastVirtualScrollInfoRef.current = nextInfo;
+            }
+        }
+    },[onVirtualScroll, virtualScrollInfo]);
+
+
+    // 比如选项A、B切换，选项A数据多把滚动条放在中间，切到B数据少未显示滚动条，切到A滚动条未更新，需要滚动下才正常
+    // https://github.com/ant-design/ant-design/issues/28468
+    const onUpdateVirtualScrollbar=useCallback((e: React.UIEvent<HTMLDivElement>)=>{
+        const { scrollTop: newScrollTop } = e.currentTarget;
+        // 更新虚拟滚动条（data container）的偏移量
+        if(newScrollTop!==offsetTop){
+            syncScrollTop(newScrollTop)
+        }
+        // 开发可能需要同步原生滚动事件
+        onNativeScroll?.(e)
+        // todo:横向滚动不会触发原生scroll事件
+        // https://github.com/react-component/virtual-list/pull/214
+        triggerVirtualScroll()
+    },[offsetTop, onNativeScroll, syncScrollTop, triggerVirtualScroll])
+
     return <div
         // fixme:为什么要加relative，子是fixed/absolute
         style={{position:'relative'}}
@@ -234,7 +277,8 @@ function VirtualList(props:VirtualListProps) {
             <Component
                 style={componentStyle}
                 ref={componentRef}
-                onScroll={onFallbackScroll}
+                /*原生scroll*/
+                onScroll={onUpdateVirtualScrollbar}
                 /* 注意这个 */
                 onMouseEnter={delayHideScrollBar}
             >
