@@ -4,6 +4,8 @@ import ResizeObserver from 'rc-resize-observer';
 import useViewHeights from "./hooks/useViewHeights";
 import useViewChildren from "./hooks/useViewChildren";
 
+const MIN_SCROLLBAR_SIZE=20
+
 interface VirtualListProps {
     getDataKey:string|((item:any)=>string);
     height?:number;
@@ -218,11 +220,11 @@ function VirtualList(props:VirtualListProps) {
         return componentStyle
     },[fullHeight, height, scrollMoving, scrollWidth, useVirtual])
 
-    const [size, setSize] = useState({ width: 0, height });
+    const [containerSize, setContainerSize] = useState({ width: 0, height });
 
-    const onHolderResize=useCallback((sizeInfo:{width:number;offsetWidth:number;height:number;offsetHeight:number;})=>{
+    const onUpdateContainerSize=useCallback((sizeInfo:{width:number;offsetWidth:number;height:number;offsetHeight:number;})=>{
         const {width,offsetWidth,height,offsetHeight}=sizeInfo
-        setSize({
+        setContainerSize({
             width:width||offsetWidth,
             height:height||offsetHeight
         })
@@ -268,12 +270,39 @@ function VirtualList(props:VirtualListProps) {
         triggerVirtualScroll()
     },[offsetTop, onNativeScroll, syncScrollTop, triggerVirtualScroll])
 
+    const verticalScrollBarRef = useRef<ScrollBarRef>();
+    const horizontalScrollBarRef = useRef<ScrollBarRef>();
+    // 非虚拟滚动时，模拟的滚动条和真实滚动条尺寸差距过大的bug
+    // https://github.com/react-component/virtual-list/pull/252
+    const getScrollbarSize=useCallback((containerSize=0,scrollRange=0)=>{
+        let baseSize=(containerSize/scrollRange)*containerSize
+        if(isNaN(baseSize)){
+            baseSize=MIN_SCROLLBAR_SIZE
+        }
+        return Math.floor(baseSize)
+    },[])
+
+    const verticalScrollbarSize=useMemo(()=>{
+        return getScrollbarSize(containerSize.height,itemScrollTop)
+    },[containerSize.height, getScrollbarSize, itemScrollTop])
+
+    const horizontalScrollbarSize=useMemo(()=>{
+        return getScrollbarSize(containerSize.width,scrollWidth)
+    },[containerSize.width, getScrollbarSize, scrollWidth])
+
+    const delayHideScrollBar=useCallback(()=>{
+        // 纵轴的滚动条
+        verticalScrollBarRef.current?.delayHidden();
+        // 横轴的滚动条
+        horizontalScrollBarRef.current?.delayHidden();
+    },[])
+
     return <div
         // fixme:为什么要加relative，子是fixed/absolute
         style={{position:'relative'}}
         className={className}
     >
-        <ResizeObserver onResize={onHolderResize}>
+        <ResizeObserver onResize={onUpdateContainerSize}>
             <Component
                 style={componentStyle}
                 ref={componentRef}
