@@ -1,5 +1,5 @@
 import {css,cx} from "@emotion/css";
-import {useMemo} from "react";
+import {useCallback, useMemo, useRef, useState} from "react";
 
 const styles={
     thumb:css`
@@ -19,8 +19,43 @@ const styles={
     visible:css``,
 }
 
+function getPageXY(
+    e: React.MouseEvent | React.TouchEvent | MouseEvent | TouchEvent,
+    horizontal: boolean,
+) {
+    // touches是触摸事件，是手机端
+    // const obj = 'touches' in e ? e.touches[0] : e;
+    // pageX/pageY返回触摸点到文档的距离
+    // return obj[horizontal ? 'pageX' : 'pageY'];
+    return e[horizontal ? 'pageX' : 'pageY'];
+}
 
-function Scrollbar() {
+interface ScrollbarProps {
+    // 是否是横向滚动条
+    horizontal?:boolean
+}
+
+function Scrollbar(props:ScrollbarProps) {
+    const {horizontal,}=props
+
+
+    const [dragging, setDragging] = React.useState(false);
+    const [pageXY, setPageXY] = React.useState<number | null>(null);
+
+    const [visible,setVisible]=useState(false)
+    const visibleTimeoutIdRef=useRef<ReturnType<typeof setTimeout>>()
+    // 鼠标在滚动条上拖动时，触发
+    const delayHidden=useCallback(()=>{
+        clearTimeout(visibleTimeoutIdRef.current)
+        setVisible(true)
+        visibleTimeoutIdRef.current=setTimeout(()=>{
+            setVisible(false)
+            // 3s后隐藏滚动条
+        },3000)
+
+
+    },[])
+
 
     const {style,thumbStyle}=useMemo(()=>{
         const style:React.CSSProperties={
@@ -62,18 +97,39 @@ function Scrollbar() {
             style,
             thumbStyle,
         }
-    },[])
+    },[horizontal, visible])
+
+    const onThumbMouseDown=useCallback((e:React.MouseEvent<HTMLDivElement>)=>{
+        setDragging(true)
+        setPageXY(getPageXY(e, horizontal));
+
+
+
+        e.stopPropagation();
+        e.preventDefault();
+    },[horizontal])
+
+    React.useEffect(() => {
+        delayHidden();
+    }, [delayHidden]);
 
     return <div
         ref={scrollbarRef}
         className={cx(styles.scrollbar,horizontal?styles.horizontal:styles.vertical,visible&&styles.visible)}
         style={style}
+        onMouseDown={(e)=>{
+            e.stopPropagation()
+            e.preventDefault()
+        }}
+        // 鼠标移出时隐藏滚动条
+        onMouseMove={delayHidden}
     >
         {/* fixme:里面的滚动条？ */}
         <div
             ref={thumbRef}
             className={cx(styles.thumb,dragging&&styles.thumbMoving)}
             style={thumbStyle}
+            onMouseDown={}
         />
     </div>
 }
