@@ -1,5 +1,5 @@
 import {css,cx} from "@emotion/css";
-import {useCallback, useMemo, useRef, useState} from "react";
+import {useEffect,useCallback, useMemo, useRef, useState} from "react";
 
 const styles={
     thumb:css`
@@ -33,14 +33,18 @@ function getPageXY(
 interface ScrollbarProps {
     // 是否是横向滚动条
     horizontal?:boolean
+    onScrollbarStartMove:()=>void;
 }
 
 function Scrollbar(props:ScrollbarProps) {
-    const {horizontal,}=props
+    const {horizontal,onScrollbarStartMove,onScrollbarStopMove,}=props
 
+    const thumbRef = useRef<HTMLDivElement>();
+    const scrollbarRef = useRef<HTMLDivElement>();
 
-    const [dragging, setDragging] = React.useState(false);
-    const [pageXY, setPageXY] = React.useState<number | null>(null);
+    const [dragging, setDragging] = useState(false);
+    const [pageXY, setPageXY] = useState<number | null>(null);
+    const [startTop, setStartTop] = useState<number | null>(null);
 
     const [visible,setVisible]=useState(false)
     const visibleTimeoutIdRef=useRef<ReturnType<typeof setTimeout>>()
@@ -99,17 +103,22 @@ function Scrollbar(props:ScrollbarProps) {
         }
     },[horizontal, visible])
 
+    const stateRef = useRef({ top, dragging, pageY: pageXY, startTop });
+    stateRef.current = { top, dragging, pageY: pageXY, startTop };
+
+
     const onThumbMouseDown=useCallback((e:React.MouseEvent<HTMLDivElement>)=>{
         setDragging(true)
         setPageXY(getPageXY(e, horizontal));
-
-
-
+        // 刚按住滚动条时记录顶部距离
+        setStartTop(stateRef.current.top);
+        // 通知外面开始滚动
+        onScrollbarStartMove()
         e.stopPropagation();
         e.preventDefault();
-    },[horizontal])
+    },[horizontal, onScrollbarStartMove])
 
-    React.useEffect(() => {
+    useEffect(() => {
         delayHidden();
     }, [delayHidden]);
 
@@ -129,7 +138,7 @@ function Scrollbar(props:ScrollbarProps) {
             ref={thumbRef}
             className={cx(styles.thumb,dragging&&styles.thumbMoving)}
             style={thumbStyle}
-            onMouseDown={}
+            onMouseDown={onThumbMouseDown}
         />
     </div>
 }
