@@ -32,15 +32,19 @@ function getPageXY(
 
 interface ScrollbarProps {
     // 是否是横向滚动条
-    horizontal?:boolean
+    horizontal:boolean
     onScrollbarStartMove:()=>void;
+    onScrollbarStopMove:()=>void;
+    scrollbarSize:number;
+    scrollWidthHeight:number;
+    containerSize:number;
 }
 
 function Scrollbar(props:ScrollbarProps) {
-    const {horizontal,onScrollbarStartMove,onScrollbarStopMove,}=props
+    const {horizontal,onScrollbarStartMove,onScrollbarStopMove,scrollbarSize,scrollWidthHeight,containerSize}=props
 
-    const thumbRef = useRef<HTMLDivElement>();
-    const scrollbarRef = useRef<HTMLDivElement>();
+    const thumbRef = useRef<HTMLDivElement|null>(null);
+    const scrollbarRef = useRef<HTMLDivElement|null>(null);
 
     const [dragging, setDragging] = useState(false);
     const [pageXY, setPageXY] = useState<number | null>(null);
@@ -60,6 +64,10 @@ function Scrollbar(props:ScrollbarProps) {
 
     },[])
 
+    const leftScrollWidthHeight=scrollWidthHeight-containerSize
+    const leftInnerRange=containerSize-scrollbarSize
+
+    
 
     const {style,thumbStyle}=useMemo(()=>{
         const style:React.CSSProperties={
@@ -101,7 +109,7 @@ function Scrollbar(props:ScrollbarProps) {
             style,
             thumbStyle,
         }
-    },[horizontal, visible])
+    },[horizontal, scrollbarSize, visible])
 
     const stateRef = useRef({ top, dragging, pageY: pageXY, startTop });
     stateRef.current = { top, dragging, pageY: pageXY, startTop };

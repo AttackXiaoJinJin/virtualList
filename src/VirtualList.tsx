@@ -3,6 +3,7 @@ import type { ResizeObserverProps } from 'rc-resize-observer';
 import ResizeObserver from 'rc-resize-observer';
 import useViewHeights from "./hooks/useViewHeights";
 import useViewChildren from "./hooks/useViewChildren";
+import Scrollbar from "./Scrollbar";
 
 const MIN_SCROLLBAR_SIZE=20
 
@@ -32,9 +33,10 @@ function VirtualList(props:VirtualListProps) {
         onNativeScroll,
         onVirtualScroll,
     }=props
-
+    // 容器高度和item高度都设置时，则使用虚拟列表
     const useVirtual = Boolean(height && itemHeight);
-    const inVirtual = useVirtual && (itemHeight! * data.length > height! || Boolean(scrollWidth));
+    // 当数据高度超过容器高度时，才会有滚动条
+    const showScrollbar = useVirtual && (itemHeight! * data.length > height! || Boolean(scrollWidth));
 
     const fillerInnerRef = useRef<HTMLDivElement>();
     const componentRef = useRef<HTMLDivElement>();
@@ -78,7 +80,7 @@ function VirtualList(props:VirtualListProps) {
 
     // 计算需要滚动的高度，开始index，最后index，滚动的偏移量==============
     const {
-        itemScrollTop,
+        scrollHeight,
         viewStartIndex,
         viewEndIndex,
         viewStartOffset,
@@ -87,23 +89,23 @@ function VirtualList(props:VirtualListProps) {
         if (!useVirtual) {
             return {
                 scrollHeight: undefined,
-                start: 0,
-                end: data.length - 1,
-                offset: undefined,
+                viewStartIndex: 0,
+                viewEndIndex: data.length - 1,
+                viewStartOffset: undefined,
             };
         }
         // Always use virtual scroll bar in avoid shaking
         // useVirtual=true
         // todo:实验下什么情况下是既在container内又用到虚拟滚动条的
-        if (!inVirtual) {
+        if (!showScrollbar) {
             return {
                 scrollHeight: fillerInnerRef.current?.offsetHeight || 0,
-                start: 0,
-                end: data.length - 1,
-                offset: undefined,
+                viewStartIndex: 0,
+                viewEndIndex: data.length - 1,
+                viewStartOffset: undefined,
             };
         }
-        let itemScrollTop=0
+        let scrollHeight=0
         let viewStartIndex:number
         let viewStartOffset:number
         let viewEndIndex:number
@@ -115,11 +117,11 @@ function VirtualList(props:VirtualListProps) {
             // 从已计算缓存的heightCache里获取每个item height
             const cacheItemHeight=viewHeights.get(itemKey)
             // item底部距离容器顶部的距离=item顶部距离+item高度
-            const itemBottom=itemScrollTop+(cacheItemHeight===undefined?itemHeight:cacheItemHeight)
+            const itemBottom=scrollHeight+(cacheItemHeight===undefined?itemHeight:cacheItemHeight)
             // 根据容器顶部和item底部判断item是否在容器中
             if(itemBottom>=offsetTop&&viewStartIndex===undefined){
                 viewStartIndex=i
-                viewStartOffset=itemScrollTop
+                viewStartOffset=scrollHeight
             }
             // 根据容器底部和item顶部判断item是否在容器中
             if(itemBottom>offsetTop+height &&viewEndIndex===undefined){
@@ -127,7 +129,7 @@ function VirtualList(props:VirtualListProps) {
             }
             // 为下一次循环赋初始值，也就是下一个item的top是上一个item的bottom
             /* fixme:算是优化？每个item是根据上一个item计算而来的，并不是每次都整体做计算 */
-            itemScrollTop=itemBottom
+            scrollHeight=itemBottom
         }
         // When scrollTop at the end but data cut to small count will reach this
         // fixme:实验下是什么情况，猜测是当滚动条已经移动到最底部后，再搜索忽然跳到中间数据时，会卡住
@@ -145,18 +147,18 @@ function VirtualList(props:VirtualListProps) {
         viewEndIndex = Math.min(viewEndIndex + 1, data.length - 1);
 
         return {
-            itemScrollTop,
+            scrollHeight,
             viewStartIndex,
             viewEndIndex,
             viewStartOffset,
         }
 
-    },[data, getDataKey, height, inVirtual, itemHeight, offsetTop, useVirtual, viewHeights])
+    },[data, getDataKey, height, showScrollbar, itemHeight, offsetTop, useVirtual, viewHeights])
 
 
 
     // 记录滚动时，data容器和指定高度容器的最大可滚动高度
-    const maxScrollHeight=itemScrollTop-height
+    const maxScrollHeight=scrollHeight-height
     const maxScrollHeightRef = useRef(maxScrollHeight);
     maxScrollHeightRef.current = maxScrollHeight;
     // 当列表不可滚动时不阻止滚动
@@ -283,8 +285,8 @@ function VirtualList(props:VirtualListProps) {
     },[])
 
     const verticalScrollbarSize=useMemo(()=>{
-        return getScrollbarSize(containerSize.height,itemScrollTop)
-    },[containerSize.height, getScrollbarSize, itemScrollTop])
+        return getScrollbarSize(containerSize.height,scrollHeight)
+    },[containerSize.height, getScrollbarSize, scrollHeight])
 
     const horizontalScrollbarSize=useMemo(()=>{
         return getScrollbarSize(containerSize.width,scrollWidth)
@@ -315,6 +317,25 @@ function VirtualList(props:VirtualListProps) {
 
             </Component>
         </ResizeObserver>
+        {/* 纵向滚动条   */}
+        {showScrollbar&&scrollHeight>height&&<Scrollbar
+            horizontal={false}
+            onScrollbarStartMove={onScrollbarStartMove}
+            onScrollbarStopMove={onScrollbarStopMove}
+            scrollbarSize={verticalScrollbarSize}
+            scrollWidthHeight={scrollHeight}
+            containerSize={containerSize.height}
+        />}
+
+        {/* 横向滚动条   */}
+        {showScrollbar&&scrollWidth>containerSize.width&&<Scrollbar
+          onScrollbarStartMove={onScrollbarStartMove}
+          onScrollbarStopMove={onScrollbarStopMove}
+          horizontal
+          scrollbarSize={horizontalScrollbarSize}
+          scrollWidthHeight={scrollWidth}
+          containerSize={containerSize.width}
+        />}
     </div>
 
 
